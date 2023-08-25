@@ -1,11 +1,14 @@
-// Import Solana web3 functinalities
+// Import Solana web3 functionalities
 const {
     Connection,
     PublicKey,
-    clusterApiUrl,
     Keypair,
     LAMPORTS_PER_SOL
 } = require("@solana/web3.js");
+const yargs = require('yargs');
+
+// Connect to the Devnet
+const connection = new Connection("http://127.0.0.1:8899", "confirmed");
 
 // Create a new keypair
 const newPair = new Keypair();
@@ -14,35 +17,24 @@ const newPair = new Keypair();
 const publicKey = new PublicKey(newPair._keypair.publicKey).toString();
 const privateKey = newPair._keypair.secretKey;
 
-// Connect to the Devnet
-const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
-
 console.log("Public Key of the generated keypair", publicKey);
 
-// Get the wallet balance from a given private key
-const getWalletBalance = async () => {
+// Get the wallet balance from a given public key
+const getWalletBalance = async (walletPublicKey) => {
     try {
-        console.log("Connection object is:", connection);
-
-        // Make a wallet (keypair) from privateKey and get its balance
-        const myWallet = await Keypair.fromSecretKey(privateKey);
-        const walletBalance = await connection.getBalance(
-            new PublicKey(newPair.publicKey)
-        );
+        const walletBalance = await connection.getBalance(walletPublicKey);
         console.log(`Wallet balance: ${parseInt(walletBalance) / LAMPORTS_PER_SOL} SOL`);
     } catch (err) {
         console.log(err);
     }
 };
 
-const airDropSol = async () => {
+const airDropSol = async (walletPublicKey) => {
     try {
-        const myWallet = await Keypair.fromSecretKey(privateKey);
-
-        // Request airdrop of 2 SOL to the wallet
-        console.log("Airdropping some SOL to my wallet!");
+        // Request airdrop of 2 SOL to the specified wallet
+        console.log("Airdropping some SOL to the wallet!");
         const fromAirDropSignature = await connection.requestAirdrop(
-            new PublicKey(myWallet.publicKey),
+            walletPublicKey,
             2 * LAMPORTS_PER_SOL
         );
         await connection.confirmTransaction(fromAirDropSignature);
@@ -51,11 +43,18 @@ const airDropSol = async () => {
     }
 };
 
-// Show the wallet balance before and after airdropping SOL
 const mainFunction = async () => {
-    await getWalletBalance();
-    await airDropSol();
-    await getWalletBalance();
-}
+    const accountAddress = yargs.argv._[0];
+    
+    if (!accountAddress) {
+        console.error("Missing account address. Please provide the account address using --account flag.");
+        return;
+    }
+    
+    const walletPublicKey = new PublicKey(accountAddress);
+    await getWalletBalance(walletPublicKey);
+    await airDropSol(walletPublicKey);
+    await getWalletBalance(walletPublicKey);
+};
 
 mainFunction();
